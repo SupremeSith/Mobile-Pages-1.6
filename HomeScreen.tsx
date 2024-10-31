@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TextInput, View, Text, StyleSheet, Alert, Image, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform, Modal, FlatList } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import * as Animatable from 'react-native-animatable';
 
 type FormData = {
   name: string;
@@ -18,18 +20,56 @@ const HomeScreen = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [showCheckIcon, setShowCheckIcon] = useState(false);
+  const [showErrorIcon, setShowErrorIcon] = useState(false);
+
+  // Recupera dados do AsyncStorage ao carregar o componente
+  useEffect(() => {
+    const loadFormData = async () => {
+      try {
+        const savedData = await AsyncStorage.getItem('formData');
+        if (savedData) {
+          setFormData(JSON.parse(savedData));
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados do AsyncStorage:', error);
+      }
+    };
+    loadFormData();
+  }, []);
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData((prevData) => ({
       ...prevData,
       [field]: value,
     }));
+
+    if (field === 'sala') {
+      setShowCheckIcon(true);
+      setTimeout(() => setShowCheckIcon(false), 1000);
+    }
+  };
+
+  const saveDataToStorage = async () => {
+    try {
+      await AsyncStorage.setItem('formData', JSON.stringify(formData));
+      Alert.alert('Sucesso', 'Dados salvos com sucesso no AsyncStorage');
+    } catch (error) {
+      console.error('Erro ao salvar dados no AsyncStorage:', error);
+    }
   };
 
   const onSubmit = () => {
+    if (!formData.name || !formData.email || !formData.sala || !formData.senha) {
+      setShowErrorIcon(true);
+      setTimeout(() => setShowErrorIcon(false), 1000);
+      return;
+    }
+
+    saveDataToStorage();
     Alert.alert(
       'Dados do formulário',
-      `Nome: ${formData.name}\n\nEmail: ${formData.email}\n\nSala: ${formData.sala}\n\nSenha: ${formData.senha}`,
+      `Nome: ${formData.name}\nEmail: ${formData.email}\nSala: ${formData.sala}\nSenha: ${formData.senha}`,
       [{ text: 'OK' }]
     );
   };
@@ -37,16 +77,9 @@ const HomeScreen = () => {
   const salas = ['Sala C13', 'Sala C19', 'Sala C17', 'Sala C16', 'Elétrica 1', 'Elétrica 2'];
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Image
-          source={require('./assets/logo-senai.jpg')}
-          style={styles.image}
-        />
-
+        <Image source={require('./assets/logo-senai.jpg')} style={styles.image} />
         <Text style={styles.subtitle}>Patrimônios em ordem</Text>
 
         <TextInput
@@ -62,21 +95,11 @@ const HomeScreen = () => {
           onChangeText={(text) => handleInputChange('email', text)}
         />
 
-        <TouchableOpacity
-          style={styles.pickerContainer}
-          onPress={() => setModalVisible(true)}
-        >
-          <Text style={styles.pickerText}>
-            {formData.sala || 'Selecione uma sala'}
-          </Text>
+        <TouchableOpacity style={styles.pickerContainer} onPress={() => setModalVisible(true)}>
+          <Text style={styles.pickerText}>{formData.sala || 'Selecione uma sala'}</Text>
         </TouchableOpacity>
 
-        <Modal
-          visible={modalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setModalVisible(false)}
-        >
+        <Modal visible={modalVisible} transparent={true} animationType="slide" onRequestClose={() => setModalVisible(false)}>
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
               <FlatList
@@ -107,12 +130,7 @@ const HomeScreen = () => {
             onChangeText={(text) => handleInputChange('senha', text)}
           />
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-            <Icon
-              name={showPassword ? 'eye' : 'eye-slash'}
-              size={20}
-              color="#333"
-              style={styles.icon}
-            />
+            <Icon name={showPassword ? 'eye' : 'eye-slash'} size={20} color="#333" style={styles.icon} />
           </TouchableOpacity>
         </View>
 
@@ -121,6 +139,18 @@ const HomeScreen = () => {
             <Text style={styles.buttonText}>Cadastrar</Text>
           </TouchableOpacity>
         </View>
+
+        {showCheckIcon && (
+          <Animatable.View animation="bounceIn" duration={700} style={styles.checkContainer}>
+            <Icon name="check-circle" size={50} color="green" />
+          </Animatable.View>
+        )}
+
+        {showErrorIcon && (
+          <Animatable.View animation="bounceIn" duration={700} style={styles.checkContainer}>
+            <Icon name="times-circle" size={50} color="#db0404" />
+          </Animatable.View>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -151,7 +181,7 @@ const styles = StyleSheet.create({
   },
   input: {
     left: 30,
-    paddingLeft: 20,
+    paddingLeft: 10,
     height: 45,
     width: 300,
     borderColor: '#CCC',
@@ -178,7 +208,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     left: 30,
-    paddingLeft: 20,
+    paddingLeft: 10,
     height: 45,
     width: 300,
     borderColor: '#CCC',
@@ -219,18 +249,22 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 10,
-    width: '80%',
+    padding: 35,
+    borderRadius: 40,
+    width: '76%',
   },
   modalItem: {
-    paddingVertical: 15,
+    paddingVertical: 17,
     borderBottomColor: '#CCC',
-    borderBottomWidth: 1,
+    borderBottomWidth: 2,
   },
   modalItemText: {
     fontSize: 16,
     color: '#333333',
+  },
+  checkContainer: {
+    alignItems: 'center',
+    marginTop: 30,
   },
 });
 
